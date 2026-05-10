@@ -1,0 +1,475 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ENUMS
+enum UserRole {
+  admin
+  director
+  solicitante
+  moderador
+  jefe_oficina
+  interno
+}
+
+enum UserStatus {
+  activo
+  inactivo
+  suspendido
+}
+
+enum EmpresaStatus {
+  activa
+  inactiva
+  suspendida
+}
+
+enum OficinaStatus {
+  activa
+  inactiva
+}
+
+enum OficinaEmpresaStatus {
+  activa
+  inactiva
+}
+
+enum TipoTramiteStatus {
+  borrador
+  activo
+  inactivo
+}
+
+enum ModoAsignacion {
+  automatico
+  manual
+}
+
+enum TipoCampo {
+  text
+  textarea
+  number
+  date
+  select
+  checkbox_group
+  radio
+  file
+  checkbox
+}
+
+enum TramiteEstado {
+  borrador
+  en_revision_interna
+  pendiente_asignacion
+  asignado
+  en_revision
+  en_revision_final
+  aprobado
+  rechazado
+  observado
+  corrigiendo
+}
+
+enum AsignacionEstado {
+  pendiente
+  en_revision
+  completada
+}
+
+enum DecisionTipo {
+  aprobado
+  rechazado
+  observado
+}
+
+enum PlantillaEstado {
+  activa
+  inactiva
+}
+
+enum NotificacionTipo {
+  info
+  warning
+  success
+  error
+}
+
+// MODELOS
+
+model User {
+  id                  String     @id @default(uuid()) @db.Uuid
+  nombre              String     @db.VarChar(100)
+  apellido            String     @db.VarChar(100)
+  email               String     @unique @db.VarChar(255)
+  password            String     @db.VarChar(255)
+  dni                 String     @unique @db.VarChar(20)
+  telefono            String?    @db.VarChar(50)
+  rol                 UserRole   @default(solicitante)
+  estado              UserStatus @default(activo)
+  empresa_id          String?    @db.Uuid
+  oficina_id          String?    @db.Uuid
+  oficina_empresa_id  String?    @db.Uuid
+  cargo                     String?    @db.VarChar(100)
+  requiere_cambio_password  Boolean    @default(false)
+  fecha_creacion            DateTime   @default(now())
+  fecha_actualizacion       DateTime   @updatedAt
+  ultimo_acceso             DateTime?
+
+  // Relaciones Directas
+  empresa         Empresa?        @relation("UsuariosEmpresa", fields: [empresa_id], references: [id])
+  oficina         Oficina?        @relation("JefesOficina", fields: [oficina_id], references: [id])
+  oficina_empresa OficinaEmpresa? @relation("UsuariosOficinaEmpresa", fields: [oficina_empresa_id], references: [id])
+
+  // Otras Relaciones
+  empresas_dirigidas Empresa[]             @relation("DirectorEmpresa")
+  tramites_creados   Tramite[]             @relation("SolicitanteTramite")
+  tramites_decididos Tramite[]             @relation("JefeDecisor")
+  archivos_subidos   Archivo[]             @relation("UsuarioSubeArchivo")
+  asignaciones       AsignacionOficina[]   @relation("JefeAsignado")
+  evaluaciones       EvaluacionSeccion[]   @relation("EvaluadorSeccion")
+  decisiones         DecisionFinal[]       @relation("JefeDecisorFinal")
+  plantillas_creadas PlantillaMensaje[]    @relation("CreadorPlantilla")
+  historiales        HistorialEstado[]       @relation("UsuarioCambiaEstado")
+  notificaciones     Notificacion[]          @relation("UsuarioNotificado")
+  historial_datos    HistorialDatosTramite[] @relation("UsuarioCambiaDatos")
+
+  @@map("users")
+}
+
+model Empresa {
+  id                  String        @id @default(uuid()) @db.Uuid
+  razon_social        String        @db.VarChar(255)
+  nombre_fantasia     String?       @db.VarChar(255)
+  cuit                String        @unique @db.VarChar(20)
+  direccion           String        @db.VarChar(255)
+  telefono            String?       @db.VarChar(50)
+  email               String        @db.VarChar(255)
+  estado              EmpresaStatus @default(activa)
+  fecha_creacion      DateTime      @default(now())
+  fecha_actualizacion DateTime      @updatedAt
+
+  director_id String? @db.Uuid
+  director    User?   @relation("DirectorEmpresa", fields: [director_id], references: [id])
+
+  usuarios         User[]           @relation("UsuariosEmpresa")
+  tramites         Tramite[]        @relation("EmpresaTramite")
+  oficinas_empresa OficinaEmpresa[] @relation("OficinasDeEmpresa")
+
+  @@map("empresas")
+}
+
+model OficinaEmpresa {
+  id             String               @id @default(uuid()) @db.Uuid
+  empresa_id     String               @db.Uuid
+  nombre         String               @db.VarChar(100)
+  descripcion    String?              @db.Text
+  direccion      String?              @db.VarChar(255)
+  telefono       String?              @db.VarChar(50)
+  estado         OficinaEmpresaStatus @default(activa)
+  fecha_creacion DateTime             @default(now())
+
+  empresa  Empresa   @relation("OficinasDeEmpresa", fields: [empresa_id], references: [id], onDelete: Cascade)
+  usuarios User[]    @relation("UsuariosOficinaEmpresa")
+  tramites Tramite[] @relation("TramiteOficinaEmpresa")
+
+  @@map("oficinas_empresa")
+}
+
+model Oficina {
+  id                     String        @id @default(uuid()) @db.Uuid
+  nombre                 String        @db.VarChar(100)
+  descripcion            String?       @db.Text
+  codigo                 String        @unique @db.VarChar(20)
+  estado                 OficinaStatus @default(activa)
+  email                  String?       @db.VarChar(255)
+  permite_decision_final Boolean       @default(false)
+  fecha_creacion         DateTime      @default(now())
+
+  jefes               User[]               @relation("JefesOficina")
+  asignaciones        AsignacionOficina[]  @relation("OficinaAsignada")
+  plantillas_mensaje  PlantillaMensaje[]   @relation("OficinaPlantilla")
+  tipos_tramite       TipoTramiteOficina[] @relation("OficinasEnTiposTramite")
+
+  @@map("oficinas")
+}
+
+model TipoTramite {
+  id              String            @id @default(uuid()) @db.Uuid
+  nombre          String            @db.VarChar(100)
+  descripcion     String            @db.Text
+  codigo          String            @db.VarChar(20)
+  version         Int               @default(1)
+  estado          TipoTramiteStatus @default(borrador)
+  modo_asignacion ModoAsignacion    @default(manual)
+  fecha_creacion  DateTime          @default(now())
+
+  secciones           SeccionTipoTramite[]  @relation("SeccionesDeTipo")
+  tramites            Tramite[]             @relation("TramitesPorTipo")
+  oficinas_asignacion TipoTramiteOficina[]  @relation("OficinasDeTipoTramite")
+
+  @@unique([codigo, version])
+  @@map("tipos_tramite")
+}
+
+model TipoTramiteOficina {
+  tipo_tramite_id String @db.Uuid
+  oficina_id      String @db.Uuid
+
+  tipo_tramite TipoTramite @relation("OficinasDeTipoTramite", fields: [tipo_tramite_id], references: [id], onDelete: Cascade)
+  oficina      Oficina     @relation("OficinasEnTiposTramite", fields: [oficina_id], references: [id], onDelete: Cascade)
+
+  @@id([tipo_tramite_id, oficina_id])
+  @@map("tipos_tramite_oficinas")
+}
+
+model SeccionTipoTramite {
+  id              String   @id @default(uuid()) @db.Uuid
+  tipo_tramite_id String   @db.Uuid
+  titulo          String   @db.VarChar(100)
+  descripcion     String?  @db.Text
+  orden           Int
+  fecha_creacion  DateTime @default(now())
+
+  tipo_tramite      TipoTramite              @relation("SeccionesDeTipo", fields: [tipo_tramite_id], references: [id], onDelete: Cascade)
+  campos            CampoSeccionTipoTramite[] @relation("CamposDeSección")
+  evaluaciones      EvaluacionSeccion[]       @relation("EvaluacionesPorSeccion")
+  tramite_secciones TramiteSeccion[]          @relation("DatosDeSección")
+  archivos          Archivo[]                @relation("ArchivosDeSección")
+
+  @@map("secciones_tipo_tramite")
+}
+
+model CampoSeccionTipoTramite {
+  id            String    @id @default(uuid()) @db.Uuid
+  seccion_id    String    @db.Uuid
+  nombre        String    @db.VarChar(80)
+  etiqueta      String    @db.VarChar(100)
+  tipo          TipoCampo
+  obligatorio   Boolean   @default(false)
+  placeholder   String?   @db.VarChar(200)
+  descripcion   String?   @db.Text
+  valor_defecto Json?
+  opciones      Json?
+  validaciones  Json?
+  orden         Int
+  fecha_creacion DateTime @default(now())
+
+  seccion        SeccionTipoTramite @relation("CamposDeSección", fields: [seccion_id], references: [id], onDelete: Cascade)
+  tramite_campos TramiteCampo[]    @relation("ValoresDeCampo")
+
+  @@map("campos_tipo_tramite")
+}
+
+model Tramite {
+  id     String        @id @default(uuid()) @db.Uuid
+  numero String        @unique @db.VarChar(20)
+  estado TramiteEstado @default(borrador)
+
+  // FKs
+  tipo_tramite_id    String  @db.Uuid
+  empresa_id         String  @db.Uuid
+  solicitante_id     String  @db.Uuid
+  oficina_empresa_id String? @db.Uuid
+  jefe_decisor_id    String? @db.Uuid
+
+  // Fechas
+  fecha_creacion            DateTime  @default(now())
+  fecha_envio_director      DateTime?
+  fecha_aprobacion_director DateTime?
+  fecha_asignacion          DateTime?
+  fecha_revision_final      DateTime?
+  fecha_decision_final      DateTime?
+  fecha_finalizacion        DateTime?
+
+  // Director
+  observaciones_director String?  @db.Text
+  aprobado_por_director  Boolean?
+
+  // Relaciones
+  tipo_tramite    TipoTramite     @relation("TramitesPorTipo", fields: [tipo_tramite_id], references: [id])
+  empresa         Empresa         @relation("EmpresaTramite", fields: [empresa_id], references: [id])
+  solicitante     User            @relation("SolicitanteTramite", fields: [solicitante_id], references: [id])
+  oficina_empresa OficinaEmpresa? @relation("TramiteOficinaEmpresa", fields: [oficina_empresa_id], references: [id])
+  jefe_decisor    User?           @relation("JefeDecisor", fields: [jefe_decisor_id], references: [id])
+
+  archivos              Archivo[]               @relation("ArchivosTramite")
+  asignaciones_oficinas AsignacionOficina[]     @relation("TramiteAsignaciones")
+  historial             HistorialEstado[]       @relation("HistorialTramite")
+  historial_datos       HistorialDatosTramite[] @relation("HistorialDatosTramiteRel")
+  notificaciones        Notificacion[]          @relation("NotificacionesTramite")
+  decision_final        DecisionFinal?          @relation("TramiteDecisionFinal")
+  secciones_datos       TramiteSeccion[]        @relation("SeccionesDatosTramite")
+
+  @@map("tramites")
+}
+
+model TramiteSeccion {
+  id         String @id @default(uuid()) @db.Uuid
+  tramite_id String @db.Uuid
+  seccion_id String @db.Uuid
+
+  tramite Tramite            @relation("SeccionesDatosTramite", fields: [tramite_id], references: [id], onDelete: Cascade)
+  seccion SeccionTipoTramite @relation("DatosDeSección", fields: [seccion_id], references: [id])
+  campos  TramiteCampo[]     @relation("CamposDeSeccionDatos")
+
+  @@unique([tramite_id, seccion_id])
+  @@map("tramite_secciones")
+}
+
+model TramiteCampo {
+  id                 String @id @default(uuid()) @db.Uuid
+  tramite_seccion_id String @db.Uuid
+  campo_id           String @db.Uuid
+  valor              Json?
+
+  tramite_seccion TramiteSeccion          @relation("CamposDeSeccionDatos", fields: [tramite_seccion_id], references: [id], onDelete: Cascade)
+  campo           CampoSeccionTipoTramite @relation("ValoresDeCampo", fields: [campo_id], references: [id])
+
+  @@unique([tramite_seccion_id, campo_id])
+  @@map("tramite_campos")
+}
+
+model HistorialDatosTramite {
+  id         String   @id @default(uuid()) @db.Uuid
+  tramite_id String   @db.Uuid
+  usuario_id String?  @db.Uuid
+  accion     String   @db.VarChar(50)
+  datos      Json
+  fecha      DateTime @default(now())
+
+  tramite Tramite @relation("HistorialDatosTramiteRel", fields: [tramite_id], references: [id], onDelete: Cascade)
+  usuario User?   @relation("UsuarioCambiaDatos", fields: [usuario_id], references: [id])
+
+  @@map("historial_datos_tramite")
+}
+
+model Archivo {
+  id              String   @id @default(uuid()) @db.Uuid
+  tramite_id      String   @db.Uuid
+  seccion_id      String?  @db.Uuid
+  nombre_original String   @db.VarChar(255)
+  nombre_archivo  String   @db.VarChar(255)
+  ruta            String   @db.VarChar(500)
+  tipo_mime       String?  @db.VarChar(100)
+  tamano_bytes    BigInt?
+  fecha_subida    DateTime @default(now())
+  subido_por      String?  @db.Uuid
+
+  tramite Tramite             @relation("ArchivosTramite", fields: [tramite_id], references: [id], onDelete: Cascade)
+  seccion SeccionTipoTramite? @relation("ArchivosDeSección", fields: [seccion_id], references: [id])
+  usuario User?               @relation("UsuarioSubeArchivo", fields: [subido_por], references: [id])
+
+  @@map("archivos")
+}
+
+model AsignacionOficina {
+  id                    String           @id @default(uuid()) @db.Uuid
+  tramite_id            String           @db.Uuid
+  oficina_id            String           @db.Uuid
+  jefe_asignado_id      String?          @db.Uuid
+  es_decisor            Boolean          @default(false)
+  estado                AsignacionEstado @default(pendiente)
+  fecha_asignacion      DateTime         @default(now())
+  fecha_inicio_revision DateTime?
+  fecha_finalizacion    DateTime?
+
+  tramite                Tramite             @relation("TramiteAsignaciones", fields: [tramite_id], references: [id], onDelete: Cascade)
+  oficina                Oficina             @relation("OficinaAsignada", fields: [oficina_id], references: [id])
+  jefe_asignado          User?               @relation("JefeAsignado", fields: [jefe_asignado_id], references: [id])
+  evaluaciones_secciones EvaluacionSeccion[] @relation("EvaluacionesAsignacion")
+
+  @@map("asignaciones_oficinas")
+}
+
+model EvaluacionSeccion {
+  id                    String   @id @default(uuid()) @db.Uuid
+  asignacion_oficina_id String   @db.Uuid
+  seccion_id            String   @db.Uuid
+  aprobada              Boolean
+  motivo_rechazo        String?  @db.Text
+  fecha_evaluacion      DateTime @default(now())
+  evaluado_por          String   @db.Uuid
+
+  asignacion_oficina AsignacionOficina  @relation("EvaluacionesAsignacion", fields: [asignacion_oficina_id], references: [id], onDelete: Cascade)
+  seccion            SeccionTipoTramite @relation("EvaluacionesPorSeccion", fields: [seccion_id], references: [id])
+  evaluador          User               @relation("EvaluadorSeccion", fields: [evaluado_por], references: [id])
+
+  @@unique([asignacion_oficina_id, seccion_id])
+  @@map("evaluaciones_secciones")
+}
+
+model DecisionFinal {
+  id                     String       @id @default(uuid()) @db.Uuid
+  tramite_id             String       @unique @db.Uuid
+  jefe_decisor_id        String       @db.Uuid
+  decision               DecisionTipo
+  secciones_a_corregir   Json?
+  mensaje_al_solicitante String       @db.Text
+  plantilla_usada_id     String?      @db.Uuid
+  fecha_decision         DateTime     @default(now())
+  ip_decisor             String?      @db.VarChar(50)
+
+  tramite         Tramite           @relation("TramiteDecisionFinal", fields: [tramite_id], references: [id], onDelete: Cascade)
+  jefe_decisor    User              @relation("JefeDecisorFinal", fields: [jefe_decisor_id], references: [id])
+  plantilla_usada PlantillaMensaje? @relation("PlantillaUtilizada", fields: [plantilla_usada_id], references: [id])
+
+  @@map("decisiones_finales")
+}
+
+model PlantillaMensaje {
+  id             String          @id @default(uuid()) @db.Uuid
+  oficina_id     String          @db.Uuid
+  nombre         String          @db.VarChar(100)
+  tipo_decision  DecisionTipo
+  contenido      String          @db.Text
+  estado         PlantillaEstado @default(activa)
+  fecha_creacion DateTime        @default(now())
+  creada_por     String?         @db.Uuid
+
+  oficina    Oficina         @relation("OficinaPlantilla", fields: [oficina_id], references: [id], onDelete: Cascade)
+  creador    User?           @relation("CreadorPlantilla", fields: [creada_por], references: [id])
+  decisiones DecisionFinal[] @relation("PlantillaUtilizada")
+
+  @@map("plantillas_mensaje")
+}
+
+model HistorialEstado {
+  id              String   @id @default(uuid()) @db.Uuid
+  tramite_id      String   @db.Uuid
+  estado_anterior String?  @db.VarChar(50)
+  estado_nuevo    String   @db.VarChar(50)
+  usuario_id      String?  @db.Uuid
+  comentario      String?  @db.Text
+  fecha_cambio    DateTime @default(now())
+  metadata        Json?
+
+  tramite Tramite @relation("HistorialTramite", fields: [tramite_id], references: [id], onDelete: Cascade)
+  usuario User?   @relation("UsuarioCambiaEstado", fields: [usuario_id], references: [id])
+
+  @@map("historial_estados")
+}
+
+model Notificacion {
+  id             String           @id @default(uuid()) @db.Uuid
+  usuario_id     String           @db.Uuid
+  tramite_id     String?          @db.Uuid
+  tipo           NotificacionTipo @default(info)
+  titulo         String           @db.VarChar(255)
+  mensaje        String           @db.Text
+  leida          Boolean          @default(false)
+  fecha_creacion DateTime         @default(now())
+  fecha_lectura  DateTime?
+  accion_url     String?          @db.VarChar(500)
+
+  usuario User     @relation("UsuarioNotificado", fields: [usuario_id], references: [id], onDelete: Cascade)
+  tramite Tramite? @relation("NotificacionesTramite", fields: [tramite_id], references: [id], onDelete: Cascade)
+
+  @@map("notificaciones")
+}
