@@ -58,30 +58,30 @@ async function main() {
     await prisma.empresa.deleteMany();
     await prisma.oficina.deleteMany();
     console.log('🗑️  Datos previos eliminados');
-    const oficinaRecursoHumano = await prisma.oficina.create({
+    const oficinaTecnica = await prisma.oficina.create({
         data: {
-            nombre: 'Recursos Humanos',
-            descripcion: 'Oficina de Recursos humanos',
-            codigo: 'RRHH',
-            email: 'rrhh@loteria.com.ar',
+            nombre: 'Oficina Técnica',
+            descripcion: 'Evalúa aspectos técnicos y de seguridad estructural',
+            codigo: 'TEC',
+            email: 'tecnica@municipio.gov.ar',
+            permite_decision_final: false,
+        },
+    });
+    const oficinaHabilitaciones = await prisma.oficina.create({
+        data: {
+            nombre: 'Habilitaciones y Permisos',
+            descripcion: 'Oficina decisora — evalúa y decide la habilitación final',
+            codigo: 'HAB',
+            email: 'habilitaciones@municipio.gov.ar',
             permite_decision_final: true,
         },
     });
-    const oficinaJuegoResponsable = await prisma.oficina.create({
-        data: {
-            nombre: 'Juego Responsable',
-            descripcion: 'Oficina Juego Responsable — evalúa y decide ',
-            codigo: 'JR',
-            email: 'juego_responsable@loteria.com.ar',
-            permite_decision_final: true,
-        },
-    });
-    console.log('🏢 Oficinas creadas:', oficinaRecursoHumano.nombre, '|', oficinaJuegoResponsable.nombre);
+    console.log('🏢 Oficinas creadas:', oficinaTecnica.nombre, '|', oficinaHabilitaciones.nombre);
     const admin = await prisma.user.create({
         data: {
             nombre: 'Administrador',
             apellido: 'Sistema',
-            email: 'admin@loteria.com.ar',
+            email: 'admin@municipio.gov.ar',
             password: await hash('Admin1234!'),
             dni: '00000001',
             telefono: '+54911000001',
@@ -110,14 +110,14 @@ async function main() {
             dni: '30222333',
             telefono: '+54911000003',
             rol: 'solicitante',
-            cargo: 'Juego',
+            cargo: 'Responsable de Trámites',
         },
     });
     const moderador = await prisma.user.create({
         data: {
             nombre: 'Jorge',
             apellido: 'Fernández',
-            email: 'moderador@loteria.com.ar',
+            email: 'moderador@municipio.gov.ar',
             password: await hash('Moderador1234!'),
             dni: '25333444',
             telefono: '+54911000004',
@@ -129,33 +129,33 @@ async function main() {
         data: {
             nombre: 'Ana',
             apellido: 'Martínez',
-            email: 'jefe_rrhh@loteria.com.ar',
+            email: 'jefe.tecnico@municipio.gov.ar',
             password: await hash('JefeTec1234!'),
             dni: '27444555',
             telefono: '+54911000005',
             rol: 'jefe_oficina',
-            cargo: 'Jefa Oficina RRHH (Técnica)',
-            oficina_id: oficinaRecursoHumano.id,
+            cargo: 'Jefa Oficina Técnica',
+            oficina_id: oficinaTecnica.id,
         },
     });
     const jefeDecisor = await prisma.user.create({
         data: {
             nombre: 'Roberto',
             apellido: 'López',
-            email: 'jefe.habilitaciones@loteria.com.ar',
+            email: 'jefe.habilitaciones@municipio.gov.ar',
             password: await hash('JefeHab1234!'),
             dni: '28555666',
             telefono: '+54911000006',
             rol: 'jefe_oficina',
             cargo: 'Jefe de Habilitaciones (Decisor)',
-            oficina_id: oficinaJuegoResponsable.id,
+            oficina_id: oficinaHabilitaciones.id,
         },
     });
     const interno = await prisma.user.create({
         data: {
             nombre: 'Lucas',
             apellido: 'Pereyra',
-            email: 'interno@loteria.com.ar',
+            email: 'interno@municipio.gov.ar',
             password: await hash('Interno1234!'),
             dni: '29666777',
             telefono: '+54911000007',
@@ -200,7 +200,7 @@ async function main() {
             estado: 'activo',
             modo_asignacion: 'automatico',
             oficinas_asignacion: {
-                create: [{ oficina_id: oficinaJuegoResponsable.id }],
+                create: [{ oficina_id: oficinaHabilitaciones.id }],
             },
         },
     });
@@ -268,7 +268,7 @@ async function main() {
     await prisma.plantillaMensaje.createMany({
         data: [
             {
-                oficina_id: oficinaJuegoResponsable.id,
+                oficina_id: oficinaHabilitaciones.id,
                 nombre: 'Aprobación estándar',
                 tipo_decision: 'aprobado',
                 creada_por: jefeDecisor.id,
@@ -279,7 +279,7 @@ async function main() {
                     'Puede retirar la documentación en nuestras oficinas. Muchas gracias.',
             },
             {
-                oficina_id: oficinaJuegoResponsable.id,
+                oficina_id: oficinaHabilitaciones.id,
                 nombre: 'Rechazo por incumplimiento',
                 tipo_decision: 'rechazado',
                 creada_por: jefeDecisor.id,
@@ -290,7 +290,7 @@ async function main() {
                     'Resolución emitida el [FECHA] por [NOMBRE_JEFE]. Para más información contáctenos.',
             },
             {
-                oficina_id: oficinaJuegoResponsable.id,
+                oficina_id: oficinaHabilitaciones.id,
                 nombre: 'Observado — requiere correcciones',
                 tipo_decision: 'observado',
                 creada_por: jefeDecisor.id,
@@ -310,13 +310,13 @@ async function main() {
     console.log('═══════════════════════════════════════════════════════════');
     console.log('  ROL            EMAIL                              CONTRASEÑA');
     console.log('───────────────────────────────────────────────────────────');
-    console.log('  admin          admin@loteria.com.ar             Admin1234!');
+    console.log('  admin          admin@municipio.gov.ar             Admin1234!');
     console.log('  director       director@empresa.com               Director1234!');
     console.log('  solicitante    solicitante@empresa.com            Solicitante1234!');
-    console.log('  moderador      moderador@loteria.com.ar         Moderador1234!');
-    console.log('  jefe_oficina   jefe_rrhh@loteria.com.ar      JefeTec1234!');
-    console.log('  jefe_decisor   jefe.habilitaciones@loteria.com.ar  JefeHab1234!');
-    console.log('  interno        interno@loteria.com.ar            Interno1234!');
+    console.log('  moderador      moderador@municipio.gov.ar         Moderador1234!');
+    console.log('  jefe_oficina   jefe.tecnico@municipio.gov.ar      JefeTec1234!');
+    console.log('  jefe_decisor   jefe.habilitaciones@municipio.gov.ar  JefeHab1234!');
+    console.log('  interno        interno@municipio.gov.ar            Interno1234!');
     console.log('═══════════════════════════════════════════════════════════\n');
     console.log('  Empresa:  Comercios del Sur S.A. (CUIT: 30-71234567-8)');
     console.log('  Tipos:    HAB_COM — Habilitación Comercial (3 secciones)');
