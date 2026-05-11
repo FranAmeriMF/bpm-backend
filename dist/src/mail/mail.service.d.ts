@@ -20,5 +20,9 @@ export declare class MailService {
     enviarResetPasswordAdmin(to: string, nombre: string, passwordTemporal: string): Promise<void>;
     enviarRecuperacionPassword(to: string, ctx: MailContext): Promise<void>;
     enviarDecisionFinal(to: string, decision: string, ctx: MailContext): Promise<void>;
+    private infoRow;
+    private credencialesBlock;
+    private btn;
+    private layout;
     private send;
 }
